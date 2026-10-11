@@ -9,20 +9,20 @@ jobs:
     steps:
       - name: Clone ArduPilot Repository
         run: |
-          git clone --depth 1 --branch Copter-4.5 https://github.com/ArduPilot/ardupilot.git
+          git clone --depth 1 --branch Copter-4.5 https://github.com
           cd ardupilot
           git submodule update --init --recursive
 
       - name: Patch Flywoo Config for Karma F405
         run: |
           cd ardupilot/libraries/AP_HAL_ChibiOS/hwdef/FlywooF405Pro
-          # Принудительно очищаем и привязываем BMP280 к I2C1
+          # Полностью переписываем блок барометра, привязав BMP280 к шине I2C1 дрона Karma
           sed -i '/I2C_ORDER/d' hwdef.dat
           sed -i '/BARO/d' hwdef.dat
           echo "I2C_ORDER I2C1" >> hwdef.dat
           echo "BARO BMP280 I2C:1:0x77" >> hwdef.dat
           
-          # Облегчаем прошивку для 1 МБ Flash-памяти чипа F405
+          # Жестко активируем режим минимизации функций, чтобы прошивка влезла в 1 МБ памяти чипа F405
           cd ../include
           echo "#define HAL_MINIMIZE_FEATURES 1" >> minimize_common.inc
 
@@ -30,14 +30,13 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y gcc-arm-none-eabi build-essential ccache git make wget python3-pip python3-setuptools
-          # Разрешаем pip ставить пакеты в обход блокировок Ubuntu
-          pip3 install --break-system-packages flake8 future lxml pymavlink
+          # Убран флаг --break-system-packages, так как в Ubuntu 22.04 он не требуется
+          pip3 install flake8 future lxml pymavlink
 
       - name: Compile Custom Firmware
         run: |
           cd ardupilot
-          # Конфигурируем и собираем легкий коптерный бинарник
-          ./waf configure --board FlywooF405Pro --disable-all-features
+          ./waf configure --board FlywooF405Pro
           ./waf copter
 
       - name: Upload Finished Firmware Artifact

@@ -7,7 +7,6 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     steps:
-      # Родной модуль GitHub для скачивания кода — без использования текстовых команд git clone
       - name: Checkout ArduPilot
         uses: actions/checkout@v4
         with:
@@ -29,6 +28,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y gcc-arm-none-eabi build-essential ccache git make wget python3-pip python3-setuptools
+          # Принудительно ставим строго требуемую компилятором версию empy и сопутствующие библиотеки
+          pip3 install empy==3.3.4
           pip3 install flake8 future lxml pymavlink
 
       - name: Compile Custom Firmware

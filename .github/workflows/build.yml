@@ -41,4 +41,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: KarmaF405_ArduPilot_Firmware
-          path: build/FlywooF405Pro/bin/arducopter.hex
+          # Задаем маску, которая заберет и .hex, и .apj файлы из папки сборки
+          path: build/FlywooF405Pro/arducopter.*

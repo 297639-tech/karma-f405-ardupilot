@@ -7,22 +7,21 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     steps:
-      - name: Clone ArduPilot Repository
-        run: |
-          git clone --depth 1 --branch Copter-4.5 https://github.com
-          cd ardupilot
-          git submodule update --init --recursive
+      # Родной модуль GitHub для скачивания кода — без использования текстовых команд git clone
+      - name: Checkout ArduPilot
+        uses: actions/checkout@v4
+        with:
+          repository: ArduPilot/ardupilot
+          ref: Copter-4.5
+          submodules: 'recursive'
 
       - name: Patch Flywoo Config for Karma F405
         run: |
-          cd ardupilot/libraries/AP_HAL_ChibiOS/hwdef/FlywooF405Pro
-          # Полностью переписываем блок барометра, привязав BMP280 к шине I2C1 дрона Karma
+          cd libraries/AP_HAL_ChibiOS/hwdef/FlywooF405Pro
           sed -i '/I2C_ORDER/d' hwdef.dat
           sed -i '/BARO/d' hwdef.dat
           echo "I2C_ORDER I2C1" >> hwdef.dat
           echo "BARO BMP280 I2C:1:0x77" >> hwdef.dat
-          
-          # Жестко активируем режим минимизации функций, чтобы прошивка влезла в 1 МБ памяти чипа F405
           cd ../include
           echo "#define HAL_MINIMIZE_FEATURES 1" >> minimize_common.inc
 
@@ -34,7 +33,6 @@ jobs:
 
       - name: Compile Custom Firmware
         run: |
-          cd ardupilot
           ./waf configure --board FlywooF405Pro
           ./waf copter
 
@@ -42,4 +40,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: KarmaF405_ArduPilot_Firmware
-          path: ardupilot/build/FlywooF405Pro/bin/arducopter.hex
+          path: build/FlywooF405Pro/bin/arducopter.hex

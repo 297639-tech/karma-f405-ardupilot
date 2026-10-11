@@ -14,71 +14,43 @@ jobs:
           ref: Copter-4.5
           submodules: 'recursive'
 
-      - name: Create Custom KarmaF405 hwdef
+      - name: Patch Config for Direct Boot
         run: |
-          # Создаем изолированную папку нового таргета в структуре ArduPilot
-          mkdir -p libraries/AP_HAL_ChibiOS/hwdef/KarmaF405V1
+          cd libraries/AP_HAL_ChibiOS/hwdef/FlywooF405Pro
+          # Полностью перенаправляем барометр на шину I2C1
+          sed -i '/I2C_ORDER/d' hwdef.dat
+          sed -i '/BARO/d' hwdef.dat
+          echo "I2C_ORDER I2C1" >> hwdef.dat
+          echo "BARO BMP280 I2C:1:0x77" >> hwdef.dat
           
-          # Записываем точную аппаратную карту строго по вашему дампу Betaflight
-          cat << 'EOF' > libraries/AP_HAL_ChibiOS/hwdef/KarmaF405V1/hwdef.dat
-          # Configuration for Karma F405 V1 Custom Board
-          MCU STM32F405 STM32F405xx
+          # Отключаем аналоговый чип OSD
+          sed -i '/MAX7456/d' hwdef.dat
+          sed -i '/OSD/d' hwdef.dat
           
-          OSCILLATOR_HZ 8000000
-          
-          PA11 OTG_FS_DM OTG1
-          PA12 OTG_FS_DP OTG1
-          
-          # SPI1 - Gyro & Accelerometer (ICM-42688-P)
-          PA5 SPI1_SCK SPI1
-          PA6 SPI1_MISO SPI1
-          PA7 SPI1_MOSI SPI1
-          PA4 GYRO_CS CS
-          PC4 GYRO_EXTI INPUT
-          
-          # I2C1 - Barometer (BMP280)
-          PB8 I2C1_SCL I2C1
-          PB9 I2C1_SDA I2C1
-          I2C_ORDER I2C1
-          
-          # SPI3 - Available for peripherals
-          PC10 SPI3_SCK SPI3
-          PC11 SPI3_MISO SPI3
-          PC12 SPI3_MOSI SPI3
-          
-          # Motors (1-4)
-          PC8 TIM3_CH3 TIM3 PWM(1)
-          PC9 TIM3_CH4 TIM3 PWM(2)
-          PA8 TIM1_CH1 TIM1 PWM(3)
-          PA9 TIM1_CH2 TIM1 PWM(4)
-          
-          # Driver linking
-          IMU Invensense SPI:SPI1:GYRO_CS
-          BARO BMP280 I2C:1:0x77
-          
-          include ../include/minimize_common.inc
-          EOF
-          
-          # Обязательный для компилятора пустой файл параметров по умолчанию
-          touch libraries/AP_HAL_ChibiOS/hwdef/KarmaF405V1/defaults.parm
+          # Заставляем компилятор собрать бинарник под прямую заливку с адреса 0x08000000 (без бутлоадера)
+          sed -i 's/FLASH_RESERVE_START_KB [0-9]*/FLASH_RESERVE_START_KB 0/g' hwdef.dat
+          sed -i 's/FLASH_BOOTLOADER_LOAD_KB [0-9]*/FLASH_BOOTLOADER_LOAD_KB 0/g' hwdef.dat
+
+          cd ../include
+          echo "#define HAL_MINIMIZE_FEATURES 1" >> minimize_common.inc
+          echo "#define OSD_ENABLED 1" >> minimize_common.inc
 
       - name: Install Base Toolchain
         run: |
           sudo apt-get update
           sudo apt-get install -y gcc-arm-none-eabi build-essential ccache git make wget python3-pip python3-setuptools
-          pip3 install empy==3.3.4
-          pip3 install flake8 future lxml pymavlink
+          pip3 install empy==3.3.4 flake8 future lxml pymavlink
 
       - name: Compile Custom Firmware
         run: |
-          # Конфигурируем и запускаем сборку нашего собственного таргета
-          ./waf configure --board KarmaF405V1
+          ./waf configure --board FlywooF405Pro
           ./waf copter
 
-      - name: Locate and Move Firmware Files
+      - name: Collect Direct Bin File
         run: |
           mkdir ready-firmware
-          find build/ -type f -name "arducopter.*" -exec cp {} ./ready-firmware/ \;
+          # Находим чистый бинарник приложения без смещения адресов
+          find build/ -type f -name "arducopter.bin" -exec cp {} ./ready-firmware/ \;
           ls -la ./ready-firmware/
 
       - name: Upload Finished Firmware Artifact

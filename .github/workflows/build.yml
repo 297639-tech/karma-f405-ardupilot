@@ -30,7 +30,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y gcc-arm-none-eabi build-essential ccache git make wget python3-pip python3-setuptools
-          # Убран флаг --break-system-packages, так как в Ubuntu 22.04 он не требуется
           pip3 install flake8 future lxml pymavlink
 
       - name: Compile Custom Firmware

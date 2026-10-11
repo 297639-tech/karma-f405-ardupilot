@@ -14,21 +14,30 @@ jobs:
           ref: Copter-4.5
           submodules: 'recursive'
 
-      - name: Patch Flywoo Config for Karma F405
+      - name: Patch Flywoo Config for Karma F405 and Walksnail
         run: |
           cd libraries/AP_HAL_ChibiOS/hwdef/FlywooF405Pro
           sed -i '/I2C_ORDER/d' hwdef.dat
           sed -i '/BARO/d' hwdef.dat
           echo "I2C_ORDER I2C1" >> hwdef.dat
           echo "BARO BMP280 I2C:1:0x77" >> hwdef.dat
+          
+          sed -i '/MAX7456/d' hwdef.dat
+          sed -i '/OSD/d' hwdef.dat
+          
+          if [ -f defaults.parm ]; then
+            echo "OSD_TYPE 5" >> defaults.parm
+            echo "MSP_OPTIONS 0" >> defaults.parm
+          fi
+
           cd ../include
           echo "#define HAL_MINIMIZE_FEATURES 1" >> minimize_common.inc
+          echo "#define OSD_ENABLED 1" >> minimize_common.inc
 
       - name: Install Base Toolchain
         run: |
           sudo apt-get update
           sudo apt-get install -y gcc-arm-none-eabi build-essential ccache git make wget python3-pip python3-setuptools
-          # Принудительно ставим строго требуемую компилятором версию empy и сопутствующие библиотеки
           pip3 install empy==3.3.4
           pip3 install flake8 future lxml pymavlink
 
@@ -37,10 +46,19 @@ jobs:
           ./waf configure --board FlywooF405Pro
           ./waf copter
 
+      - name: Locate and Move Firmware Files
+        run: |
+          # Создаем гарантированно видимую папку в корне проекта
+          mkdir ready-firmware
+          # Принудительно находим скомпилированные файлы прошивки и копируем их туда
+          find build/ -type f -name "arducopter.hex" -exec cp {} ./ready-firmware/ \;
+          find build/ -type f -name "arducopter.apj" -exec cp {} ./ready-firmware/ \;
+          # Выводим отчет в консоль, чтобы убедиться, что они скопированы
+          ls -la ./ready-firmware/
+
       - name: Upload Finished Firmware Artifact
         uses: actions/upload-artifact@v4
         with:
           name: KarmaF405_ArduPilot_Firmware
-          # Указываем точный путь к скомпилированному файлу с бутлоадером
-          path: build/FlywooF405Pro/bin/*_with_bl.hex
-
+          # Указываем упаковщику забрать файлы из нашей новой папки
+          path: ready-firmware/

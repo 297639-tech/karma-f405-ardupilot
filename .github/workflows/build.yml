@@ -1,11 +1,11 @@
 name: Build Karma F405 ArduPilot
 
 on:
-  workflow_dispatch: # Позволяет запускать сборку вручную кнопкой
+  workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - name: Clone ArduPilot Repository
         run: |
@@ -16,27 +16,28 @@ jobs:
       - name: Patch Flywoo Config for Karma F405
         run: |
           cd ardupilot/libraries/AP_HAL_ChibiOS/hwdef/FlywooF405Pro
-          # Полностью переписываем блок барометра в hwdef.dat, привязав BMP280 к шине I2C1
+          # Принудительно очищаем и привязываем BMP280 к I2C1
           sed -i '/I2C_ORDER/d' hwdef.dat
           sed -i '/BARO/d' hwdef.dat
           echo "I2C_ORDER I2C1" >> hwdef.dat
           echo "BARO BMP280 I2C:1:0x77" >> hwdef.dat
           
-          # Облегчаем прошивку, чтобы точно влезла в 1 МБ памяти F405
+          # Облегчаем прошивку для 1 МБ Flash-памяти чипа F405
           cd ../include
           echo "#define HAL_MINIMIZE_FEATURES 1" >> minimize_common.inc
 
-      - name: Install Compiler Prerequisites
+      - name: Install Base Toolchain
         run: |
-          cd ardupilot
-          USER=root Tools/environment_install/install-prereqs-ubuntu.sh -y
-          . ~/.profile
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi build-essential ccache git make wget python3-pip python3-setuptools
+          # Разрешаем pip ставить пакеты в обход блокировок Ubuntu
+          pip3 install --break-system-packages flake8 future lxml pymavlink
 
       - name: Compile Custom Firmware
         run: |
           cd ardupilot
-          . ~/.profile
-          ./waf configure --board FlywooF405Pro
+          # Конфигурируем и собираем легкий коптерный бинарник
+          ./waf configure --board FlywooF405Pro --disable-all-features
           ./waf copter
 
       - name: Upload Finished Firmware Artifact

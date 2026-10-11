@@ -17,13 +17,11 @@ jobs:
       - name: Patch Flywoo Config for Karma F405
         run: |
           cd libraries/AP_HAL_ChibiOS/hwdef/FlywooF405Pro
-          # Жестко перенаправляем барометр на шину I2C1 вашей платы Кармы
           sed -i '/I2C_ORDER/d' hwdef.dat
           sed -i '/BARO/d' hwdef.dat
           echo "I2C_ORDER I2C1" >> hwdef.dat
           echo "BARO BMP280 I2C:1:0x77" >> hwdef.dat
           
-          # Полностью вырезаем аналоговое OSD для экономии памяти
           sed -i '/MAX7456/d' hwdef.dat
           sed -i '/OSD/d' hwdef.dat
 
@@ -36,20 +34,17 @@ jobs:
           sudo apt-get install -y gcc-arm-none-eabi build-essential ccache git make wget python3-pip python3-setuptools
           pip3 install empy==3.3.4 flake8 future lxml pymavlink
 
-      - name: Compile Bootloader and Firmware
+      - name: Force Compile Custom Bootloader and Firmware
         run: |
-          # Конфигурируем плату
           ./waf configure --board FlywooF405Pro
-          # Шаг 1: Принудительно собираем кастомный загрузчик с нашей картой I2C1
-          ./waf bootloader
-          # Шаг 2: Собираем само приложение Copter
+          # Принудительно собираем загрузчик из исходного кода ChibiOS, игнорируя бинарные заготовки
+          python3 Tools/scripts/build_bootloader.py FlywooF405Pro
           ./waf copter
 
       - name: Export Consolidated Hex File
         run: |
-          # Создаем чистую папку в корне проекта
           mkdir ready-firmware
-          # Копируем официальный монолитный файл прошивки, который содержит в себе И загрузчик И приложение
+          # Забираем созданный монолитный hex, собранный на базе нашего нового загрузчика
           cp build/FlywooF405Pro/bin/arducopter_with_bl.hex ./ready-firmware/karma_firmware.hex
           ls -la ./ready-firmware/
 
